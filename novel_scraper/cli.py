@@ -301,10 +301,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """CLI entrypoint."""
+    if argv is None:
+        argv = sys.argv[1:]
+
+    # Direct URL convenience: if first argument is a URL, default to 'download'
+    known_commands = {
+        "download",
+        "resume",
+        "chapters",
+        "epub",
+        "sites",
+        "config",
+        "-h",
+        "--help",
+        "-v",
+        "--version",
+    }
+    if argv and argv[0] not in known_commands and not argv[0].startswith("-"):
+        if argv[0].startswith(("http://", "https://")):
+            argv = ["download"] + argv
+
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     config = load_config()
 

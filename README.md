@@ -83,7 +83,22 @@ pip install -e .
 
 The CLI can be invoked either as `novel-scraper` or via `python -m novel_scraper`.
 
-### 1. Discover and List Chapters
+### 1. Direct Scraping via URL (Shortcuts)
+
+You can pass any novel or chapter URL directly without needing to type a subcommand:
+
+```bash
+# Scrape and build EPUB directly from URL
+novel-scraper https://novelping.com/book/journey-to-become-a-true-god/chapter-1
+
+# Scrape chapter range directly from URL
+novel-scraper https://novelping.com/book/journey-to-become-a-true-god --start-chapter 1 --end-chapter 50
+
+# Scrape any web novel site directly using the Generic Fallback Adapter
+novel-scraper https://my-novel-website.com/series/fantasy-story/chapter-1
+```
+
+### 2. Discover and List Chapters
 
 Inspect a novel, its author, genres, and preview available chapters without downloading:
 

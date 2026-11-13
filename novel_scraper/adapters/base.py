@@ -23,15 +23,28 @@ def get_adapter(
     url: str,
     session: Optional[requests.Session] = None,
     config: Optional[Config] = None,
+    allow_generic: bool = True,
 ) -> "BaseAdapter":
     """Find and return an instantiated adapter capable of handling the URL.
+
+    Checks specialized adapters first, then falls back to generic direct-URL adapters.
 
     Raises:
         UnsupportedWebsiteError if no adapter can handle the given URL.
     """
+    # 1. Specialized adapters first
     for adapter_cls in _ADAPTER_REGISTRY:
+        if getattr(adapter_cls, "is_generic", False):
+            continue
         if adapter_cls.can_handle(url):
             return adapter_cls(session=session, config=config)
+
+    # 2. Generic fallback if enabled
+    if allow_generic:
+        for adapter_cls in _ADAPTER_REGISTRY:
+            if getattr(adapter_cls, "is_generic", False) and adapter_cls.can_handle(url):
+                return adapter_cls(session=session, config=config)
+
     raise UnsupportedWebsiteError(f"No adapter available for URL: {url}")
 
 

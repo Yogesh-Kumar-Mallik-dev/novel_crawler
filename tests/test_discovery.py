@@ -34,7 +34,7 @@ def test_url_recognition():
     for url in invalid_urls:
         assert NovelPingAdapter.can_handle(url) is False
         with pytest.raises(UnsupportedWebsiteError):
-            get_adapter(url)
+            get_adapter(url, allow_generic=False)
 
 
 def test_chapter_discovery_from_archive_fixture():

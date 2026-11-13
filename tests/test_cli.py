@@ -75,3 +75,20 @@ def test_cli_config_command(capsys):
     assert ret == 0
     captured = capsys.readouterr()
     assert "request_delay: 0.5" in captured.out
+
+
+def test_direct_url_argv_handling():
+    """Verify that passing a URL directly defaults to the download subcommand."""
+    from novel_scraper.cli import main
+    from unittest.mock import patch
+
+    mock_download = MagicMock(return_value=0)
+    with patch("novel_scraper.cli.handle_download", mock_download):
+        with patch("sys.exit") as mock_exit:
+            main(["https://example.com/novel/ch1", "--start-chapter", "1", "--end-chapter", "5"])
+            mock_exit.assert_called_with(0)
+            assert mock_download.called
+            call_args = mock_download.call_args[0][0]
+            assert call_args.url == "https://example.com/novel/ch1"
+            assert call_args.start_chapter == 1.0
+            assert call_args.end_chapter == 5.0
