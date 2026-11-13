@@ -37,6 +37,16 @@ def test_cli_parser_build():
     assert args_resume.command == "resume"
     assert args_resume.url == "https://novelping.com/book/journey-to-become-a-true-god"
 
+    # Test retry-failed command parsing
+    args_rf = parser.parse_args([
+        "retry-failed",
+        "https://novelping.com/book/journey-to-become-a-true-god",
+        "--no-epub",
+    ])
+    assert args_rf.command == "retry-failed"
+    assert args_rf.url == "https://novelping.com/book/journey-to-become-a-true-god"
+    assert args_rf.no_epub is True
+
     # Test chapters command parsing
     args_ch = parser.parse_args([
         "chapters",

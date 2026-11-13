@@ -8,6 +8,9 @@ A robust, modular Python command-line application that scrapes publicly accessib
 
 - **Modular Website Adapter Architecture**: Add support for any web novel platform simply by implementing a `BaseAdapter` subclass without modifying core application logic.
 - **NovelPing Adapter**: Full support for [NovelPing](https://novelping.com), including metadata extraction, full archive chapter discovery (over 4,600+ chapters), and noise-free chapter content extraction.
+- **Alternate Mirror Fallbacks & Wayback Machine**: When a chapter fetch fails or returns empty/broken on the primary site, NovelScraper automatically searches trusted public web novel mirrors (`novelfull`, `readnovelfull`, `novelbuddy`, `novelcool`, `freewebnovel`, `wuxiabox`, etc.) and the Internet Archive Wayback Machine to retrieve the content seamlessly.
+- **Network Outage Resilience**: Automatically detects local network disconnections (`Network is unreachable`, DNS failure) and pauses with an automatic reconnect countdown rather than marking batches of chapters as failed.
+- **Dedicated Failed Recovery (`retry-failed`)**: Quick command to target ONLY failed chapters in SQLite, recover them using primary and mirror sources, and update the EPUB.
 - **SQLite Persistence & Resumption**: All metadata and chapter states (`pending`, `completed`, `failed`) are stored locally in SQLite (`downloads/<novel_id>.db`). Interrupted downloads can be resumed at any time without redownloading completed chapters.
 - **Fault-Tolerant & Polite Crawling**: Configurable request delay, exponential backoff retries on network failures, graceful `Ctrl+C` interrupt handling, and per-chapter failure recovery.
 - **Strict Content Sanitization**: Decomposes ads, social buttons, scripts, hidden trackers, and navigation elements while preserving semantic text (`<p>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<br>`, headings, and clean formatting).
@@ -26,6 +29,7 @@ novel-scraper/
 │   ├── cli.py                  # Command-line interface and subcommands
 │   ├── config.py               # Application settings and persistence
 │   ├── downloader.py           # Sequential download engine with SQLite tracking
+│   ├── fallback.py             # Alternate mirror & Wayback Machine fallback resolver
 │   ├── chapter_discovery.py    # Discovery and chapter range filtering
 │   ├── content_extractor.py    # HTML cleaner and XHTML paragraph sanitizer
 │   ├── epub_builder.py         # EPUB 3 packaging, metadata, TOC, and validation
@@ -36,7 +40,8 @@ novel-scraper/
 │   └── adapters/
 │       ├── __init__.py         # Registry and adapter discovery
 │       ├── base.py             # Abstract BaseAdapter contract
-│       └── novelping.py        # NovelPing.com website adapter
+│       ├── novelping.py        # NovelPing.com website adapter
+│       └── generic.py          # Universal generic reader adapter
 ├── tests/
 │   ├── test_cli.py             # CLI parser and argument tests
 │   ├── test_database.py        # SQLite persistence and state tests
@@ -44,6 +49,8 @@ novel-scraper/
 │   ├── test_downloader.py      # Resumption, failure handling, and retry tests
 │   ├── test_epub.py            # EPUB 3 validation tests
 │   ├── test_extraction.py      # HTML sanitization and noise removal tests
+│   ├── test_fallback.py        # Alternate mirrors, Wayback, and network resilience tests
+│   ├── test_generic.py         # Universal heuristic fallback tests
 │   ├── test_retry.py           # HTTP backoff and retry tests
 │   └── fixtures/               # Offline HTML test fixtures
 ├── downloads/                  # Output directory for SQLite DBs and EPUBs
@@ -156,7 +163,25 @@ This will automatically:
 - Reset any previously failed chapters back to `pending`.
 - Recompile the EPUB with all completed chapters upon completion.
 
-### 4. Rebuild EPUB from Local Database
+### 4. Retry Failed Chapters with Alternate Mirror Fallback
+
+If specific chapters failed during download (e.g. temporary network drop, remote server 500 error, or page blocked), run `retry-failed` to process **only** the failed records without scanning thousands of pending chapters:
+
+```bash
+# Retry failed chapters and update the EPUB
+novel-scraper retry-failed https://novelping.com/book/journey-to-become-a-true-god
+
+# Retry failed chapters in SQLite only without rebuilding EPUB
+novel-scraper retry-failed https://novelping.com/book/journey-to-become-a-true-god --no-epub
+```
+
+NovelScraper will:
+1. Re-attempt the primary site adapter.
+2. If the primary site fails, query candidate mirrors (`novelfull`, `readnovelfull`, `novelbuddy`, etc.) and the Wayback Machine.
+3. Automatically sanitize, validate, and mark recovered chapters as `completed` in SQLite.
+4. Update the EPUB file seamlessly.
+
+### 5. Rebuild EPUB from Local Database
 
 Generate an EPUB from previously downloaded chapters stored in SQLite without hitting the remote website:
 
@@ -171,7 +196,7 @@ novel-scraper epub https://novelping.com/book/journey-to-become-a-true-god --all
 novel-scraper epub https://novelping.com/book/journey-to-become-a-true-god --all-chapters --output ~/MyNovel.epub
 ```
 
-### 5. View Supported Websites
+### 6. View Supported Websites
 
 ```bash
 novel-scraper sites
@@ -183,7 +208,7 @@ Supported Websites:
   - NovelPing (Domain: novelping.com)
 ```
 
-### 6. Configuration Management
+### 7. Configuration Management
 
 View or update global settings stored in `~/.config/novel-scraper/config.json`:
 

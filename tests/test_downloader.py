@@ -79,9 +79,9 @@ def test_download_resumption_and_failure_resilience(tmp_path: Path):
     assert chapters_in_db[1].status == DownloadStatus.FAILED
     assert chapters_in_db[2].status == DownloadStatus.COMPLETED
 
-    # Verify call counts: ch1 called once, ch2 called once, ch3 called once
+    # Verify call counts: ch1 called once, ch2 called twice (1 initial + 1 automatic retry pass), ch3 called once
     assert adapter.extract_call_count["https://mocksite.com/ch1"] == 1
-    assert adapter.extract_call_count["https://mocksite.com/ch2"] == 1
+    assert adapter.extract_call_count["https://mocksite.com/ch2"] == 2
     assert adapter.extract_call_count["https://mocksite.com/ch3"] == 1
 
     # Second run without force: ch1 and ch3 are completed, should be skipped

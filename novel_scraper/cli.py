@@ -113,6 +113,48 @@ def handle_resume(args: argparse.Namespace, config: Config) -> int:
     return 0 if not result.failed else 1
 
 
+def handle_retry_failed(args: argparse.Namespace, config: Config) -> int:
+    """Retry ONLY previously failed chapters using primary adapter and alternate mirror fallbacks."""
+    if args.delay is not None:
+        config.request_delay = args.delay
+    if args.timeout is not None:
+        config.request_timeout = args.timeout
+
+    downloader = Downloader(config=config)
+    try:
+        result = downloader.download_novel(
+            url=args.url,
+            retry_failed_only=True,
+        )
+    except NovelScraperError as exc:
+        print(f"Error during retry-failed: {exc}", file=sys.stderr)
+        return 1
+
+    print("\nRetry-Failed Summary:")
+    print(f"  Novel: {result.metadata.title}")
+    print(f"  Recovered / Downloaded: {result.downloaded}")
+    print(f"  Still failed: {len(result.failed)}")
+
+    if not getattr(args, "no_epub", False) and result.downloaded > 0:
+        print("\nUpdating EPUB file with recovered chapters...")
+        db = downloader.get_database_for_novel(result.metadata)
+        completed_chapters = db.get_chapters(
+            result.metadata.novel_id or sanitize_filename(result.metadata.title),
+            status=DownloadStatus.COMPLETED,
+        )
+        if completed_chapters:
+            builder = EpubBuilder(config=config)
+            output_path = Path(args.output) if getattr(args, "output", None) else None
+            epub_path = builder.build_epub(
+                metadata=result.metadata,
+                chapters=completed_chapters,
+                output_path=output_path,
+            )
+            print(f"EPUB updated successfully: {epub_path}")
+
+    return 0 if not result.failed else 1
+
+
 def handle_chapters(args: argparse.Namespace, config: Config) -> int:
     """List available chapters for a novel."""
     try:
@@ -268,7 +310,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_res.add_argument("--delay", type=float, help="Polite delay between requests (seconds).")
     p_res.add_argument("--timeout", type=float, help="Request timeout (seconds).")
     p_res.add_argument("--output", type=str, help="Custom path for the generated EPUB file.")
+    p_res.add_argument("--no-epub", action="store_true", help="Skip EPUB generation.")
     p_res.set_defaults(func=handle_resume)
+
+    # 2b. retry-failed
+    p_rf = subparsers.add_parser("retry-failed", help="Retry ONLY failed chapters using primary adapter and alternate mirror fallbacks.")
+    p_rf.add_argument("url", help="Novel or chapter URL.")
+    p_rf.add_argument("--delay", type=float, help="Polite delay between requests (seconds).")
+    p_rf.add_argument("--timeout", type=float, help="Request timeout (seconds).")
+    p_rf.add_argument("--output", type=str, help="Custom path for the generated EPUB file.")
+    p_rf.add_argument("--no-epub", action="store_true", help="Skip EPUB generation.")
+    p_rf.set_defaults(func=handle_retry_failed)
 
     # 3. chapters
     p_ch = subparsers.add_parser("chapters", help="List discovered chapters for a novel.")
@@ -310,6 +362,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     known_commands = {
         "download",
         "resume",
+        "retry-failed",
         "chapters",
         "epub",
         "sites",
